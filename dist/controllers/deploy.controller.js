@@ -9,7 +9,6 @@ const node_ssh_1 = require("node-ssh");
 const ipfs_util_1 = require("../utils/ipfs.util");
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const ssh = new node_ssh_1.NodeSSH();
-// EC2 config from env
 const EC2_HOST = process.env.EC2_HOST;
 const EC2_USERNAME = process.env.EC2_USERNAME;
 const EC2_PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----
@@ -46,7 +45,7 @@ const deployFolder = async (req, res) => {
         if (!folderName) {
             return res.status(400).json({
                 success: false,
-                message: "folderName is required in the request body.",
+                message: "folderName is required.",
             });
         }
         const localFolderPath = path_1.default.join("upload", folderName);
@@ -56,35 +55,42 @@ const deployFolder = async (req, res) => {
                 message: `Local folder '${folderName}' does not exist.`,
             });
         }
-        // 1️⃣ Upload to IPFS via Pinata
+        // Upload folder to IPFS (Pinata)
         const ipfsCid = await (0, ipfs_util_1.uploadFolderToIPFS)(localFolderPath, folderName);
-        console.log(`Uploaded to IPFS with CID: ${ipfsCid}`);
-        // 2️⃣ Upload to EC2 via SSH
+        console.log("IPFS CID:", ipfsCid);
+        // Connect to EC2
         await ssh.connect({
             host: EC2_HOST,
             username: EC2_USERNAME,
             privateKey: EC2_PRIVATE_KEY,
         });
-        const remoteFolder = path_1.default.posix.join(EC2_TARGET_DIR, folderName);
-        // Ensure remote folder exists
+        const remoteFolder = `${EC2_TARGET_DIR}/${folderName}`;
+        // Create target directory
         await ssh.execCommand(`mkdir -p ${remoteFolder}`);
-        // Upload folder recursively
+        // Upload folder
+        console.log("Uploading folder to EC2...");
         await ssh.putDirectory(localFolderPath, remoteFolder, {
             recursive: true,
             concurrency: 5,
-            validate: (itemPath) => true,
-            tick: (localPath, remotePath, error) => {
+            validate: () => true,
+            tick: (local, remote, error) => {
                 if (error)
-                    console.error(`Failed to upload ${localPath}: ${error}`);
+                    console.error(`Upload error:`, local);
             },
         });
-        ssh.dispose(); // close SSH connection
+        // Make deployment.sh executable
+        await ssh.execCommand(`chmod +x ${remoteFolder}/deployment.sh`);
+        // Run deployment.sh
+        console.log("Running deployment.sh...");
+        const output = await ssh.execCommand(`cd ${remoteFolder} && bash deployment.sh`);
+        ssh.dispose();
         return res.status(200).json({
             success: true,
-            message: `Folder '${folderName}' deployed successfully.`,
+            message: "Deployment completed successfully.",
             data: {
-                ec2RemotePath: remoteFolder,
+                ec2Path: remoteFolder,
                 ipfsCid,
+                deploymentLogs: output.stdout,
             },
         });
     }
@@ -93,7 +99,7 @@ const deployFolder = async (req, res) => {
         ssh.dispose();
         return res.status(500).json({
             success: false,
-            message: "Failed to deploy folder.",
+            message: "Deployment failed.",
             error: error.message,
         });
     }

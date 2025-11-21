@@ -24,6 +24,7 @@ You are an AI assistant. Generate a Python Flask app named "app.py" that does th
 5. Always return JSON responses: {"success": true, "prediction": ..., "error": null} or on error {"success": false, "prediction": null, "error": "..."}.
 6. Handle missing input keys and exceptions.
 7. Include Flask in imports. Do not add any extra text or explanation.
+8. PORT should be between 3001-3010
 Model Description: ${modelDescription}
 Return the response strictly as JSON in the format {"app.py": "<full python code>"}.
 `;
