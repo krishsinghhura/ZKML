@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/controllers/upload.controller.ts","./src/middlewares/upload.middleware.ts","./src/routes/upload.route.ts","./src/services/gemeni.service.ts","./src/services/naming.service.ts"],"version":"5.9.3"}
+{"root":["./src/index.ts","./src/controllers/deploy.controller.ts","./src/controllers/upload.controller.ts","./src/middlewares/upload.middleware.ts","./src/routes/deploy.route.ts","./src/routes/upload.route.ts","./src/services/gemeni.service.ts","./src/services/naming.service.ts","./src/utils/ipfs.util.ts"],"version":"5.9.3"}

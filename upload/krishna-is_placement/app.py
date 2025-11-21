@@ -32,12 +32,13 @@ def predict():
     if not data:
         return jsonify({"success": False, "prediction": None, "error": "Invalid JSON input or no data provided."}), 400
 
-    # Define the required keys in the expected order for the model
+    # CRITICAL FIX: This list now contains exactly 17 input features, matching the model's expectation.
+    # 'is_placed' is the target variable and MUST be excluded from the input features.
     required_keys = [
         "tier", "cgpa", "inter_gpa", "ssc_gpa", "internships", "no_of_projects",
         "is_participate_hackathon", "is_participated_extracurricular",
         "no_of_programming_languages", "dsa", "mobile_dev", "web_dev",
-        "Machine Learning", "cloud", "is_placed", "CSE", "ECE", "MECH"
+        "Machine Learning", "cloud", "CSE", "ECE", "MECH"
     ]
 
     # Check for missing keys
@@ -46,7 +47,7 @@ def predict():
         return jsonify({"success": False, "prediction": None, "error": f"Missing required keys in input: {', '.join(missing_keys)}"}), 400
 
     try:
-        # Prepare features list in the correct order
+        # Prepare features list in the correct order (17 features)
         features = [data[key] for key in required_keys]
 
         # Model expects a 2D array (e.g., [[feature1, feature2, ...]]) for a single sample
