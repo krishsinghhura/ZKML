@@ -116,7 +116,7 @@ export const handleUpload = async (req: Request, res: Response) => {
         path.basename(appPyPath),
       ],
       appPy: path.basename(appPyPath),
-      txHash: "546576879tfghkj",
+      txHash: "546576879tfghkj", //registrationResult.tx_hash
       verified: true,
     });
 
