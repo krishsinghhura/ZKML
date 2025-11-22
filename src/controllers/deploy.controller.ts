@@ -3,6 +3,7 @@ import path from "path";
 import { NodeSSH } from "node-ssh";
 import { uploadFolderToIPFS } from "../utils/ipfs.util";
 import fs from "fs-extra";
+import { User, Model } from "../DBmodel/model";
 
 const ssh = new NodeSSH();
 
@@ -35,6 +36,7 @@ I8kLK4KpAoGBALvs9sBHyHWGjx9RVTlnvnMj3vb7iOLmvmTA2LB2IByqCSG3ldsl
 tTi4KOn00+mJXmXIaLeTr/b8F+NoprZOfUTbz/5M3vO1zvv2mE+8aV/F0S/Hs4cc
 qAgAwt22cGlgtRD2jTuIoYzT0ZpPbdmM9eMazIIrWUYKGz5B3JWIuJqL
 -----END RSA PRIVATE KEY-----`;
+
 const EC2_TARGET_DIR = process.env.EC2_TARGET_DIR!;
 
 export const deployFolder = async (req: Request, res: Response) => {
@@ -48,6 +50,15 @@ export const deployFolder = async (req: Request, res: Response) => {
       });
     }
 
+    const model = await Model.findOne({ folder: folderName });
+
+    if (!model) {
+      return res.status(404).json({
+        success: false,
+        message: `No model found with folder '${folderName}'.`,
+      });
+    }
+
     const localFolderPath = path.join("upload", folderName);
 
     if (!(await fs.pathExists(localFolderPath))) {
@@ -57,11 +68,9 @@ export const deployFolder = async (req: Request, res: Response) => {
       });
     }
 
-    // Upload folder to IPFS (Pinata)
     const ipfsCid = await uploadFolderToIPFS(localFolderPath, folderName);
     console.log("IPFS CID:", ipfsCid);
 
-    // Connect to EC2
     await ssh.connect({
       host: EC2_HOST,
       username: EC2_USERNAME,
@@ -70,10 +79,8 @@ export const deployFolder = async (req: Request, res: Response) => {
 
     const remoteFolder = `${EC2_TARGET_DIR}/${folderName}`;
 
-    // Create target directory
     await ssh.execCommand(`mkdir -p ${remoteFolder}`);
 
-    // Upload folder
     console.log("Uploading folder to EC2...");
     await ssh.putDirectory(localFolderPath, remoteFolder, {
       recursive: true,
@@ -84,10 +91,8 @@ export const deployFolder = async (req: Request, res: Response) => {
       },
     });
 
-    // Make deployment.sh executable
     await ssh.execCommand(`chmod +x ${remoteFolder}/deployment.sh`);
 
-    // Run deployment.sh
     console.log("Running deployment.sh...");
     const output = await ssh.execCommand(
       `cd ${remoteFolder} && bash deployment.sh`
@@ -95,13 +100,29 @@ export const deployFolder = async (req: Request, res: Response) => {
 
     ssh.dispose();
 
+    // NEW HARDCODED ENDPOINT
+    const endpointUrl = "http://13.203.86.149:5000/predict";
+
+    model.set({
+      deployed: true,
+      port: 5000,
+      routes: ["/predict"],
+      ipfsCid,
+      ec2Path: remoteFolder,
+      endpointUrl, // New DB field
+    });
+
+    await model.save();
+
     return res.status(200).json({
       success: true,
       message: "Deployment completed successfully.",
       data: {
         ec2Path: remoteFolder,
         ipfsCid,
+        endpointUrl,
         deploymentLogs: output.stdout,
+        updatedModel: model,
       },
     });
   } catch (error: any) {
